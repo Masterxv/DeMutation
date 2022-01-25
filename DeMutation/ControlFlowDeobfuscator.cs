@@ -47,22 +47,20 @@ namespace DeMutation
         private void ProcessBlock(Block block, Value value = null)
         {
             if (VisitedBlocks.Contains(block))
-            {
                 return;
-            }
+
             VisitedBlocks.Add(block);
-            if (value != null)
-            {
+            if (value != null)           
                 Emulator.SetLocal(Context, value);
-            }
+            
             foreach (Instr instr in block.Instructions)
             {
                 ProcessInstruction(instr.Instruction);
             }
-            Value currentValue = Emulator.GetLocal(Context);
+            
             foreach (Block target in block.GetTargets())
             {
-                ProcessBlock(target, currentValue);
+                ProcessBlock(target, Emulator.GetLocal(Context));
             }
         }
 
@@ -97,13 +95,13 @@ namespace DeMutation
 
         private Local FindContext(MethodDef method)
         {
-            Dictionary<Local, int> frequencies = new Dictionary<Local, int>();
+            Dictionary<Local, int> LocalFlows = new Dictionary<Local, int>();
             LocalList locals = method.Body.Variables;
             foreach (Local local in locals)
             {
                 if (local.Type.ElementType == ElementType.U4)
                 {
-                    frequencies.Add(local, 0);
+                    LocalFlows.Add(local, 0);
                 }
             }
             IList<Instruction> instructions = method.Body.Instructions;
@@ -113,9 +111,9 @@ namespace DeMutation
                 if (instr.OpCode == OpCodes.Ldloca || instr.OpCode == OpCodes.Ldloca_S)
                 {
                     Local local2 = instr.GetLocal(locals);
-                    if (frequencies.ContainsKey(local2))
+                    if (LocalFlows.ContainsKey(local2))
                     {
-                        frequencies.Remove(local2);
+                        LocalFlows.Remove(local2);
                     }
                 }
                 else
@@ -125,31 +123,31 @@ namespace DeMutation
                         continue;
                     }
                     Local local3 = instr.GetLocal(locals);
-                    if (frequencies.ContainsKey(local3))
+                    if (LocalFlows.ContainsKey(local3))
                     {
                         Instruction before = instructions[i - 1];
                         if (!before.IsLdcI4() && !IsArithmethic(before))
                         {
-                            frequencies.Remove(local3);
+                            LocalFlows.Remove(local3);
                         }
                         else
                         {
-                            frequencies[local3]++;
+                            LocalFlows[local3]++;
                         }
                     }
                 }
             }
-            if (frequencies.Count == 1)
+            if (LocalFlows.Count == 1)
             {
-                return frequencies.Keys.ToArray()[0];
+                return LocalFlows.Keys.ToArray()[0];
             }
-            if (frequencies.Count == 0)
+            if (LocalFlows.Count == 0)
             {
                 return null;
             }
             int highestCount = 0;
             Local highestLocal = null;
-            foreach (KeyValuePair<Local, int> entry in frequencies)
+            foreach (KeyValuePair<Local, int> entry in LocalFlows)
             {
                 if (entry.Value > highestCount)
                 {

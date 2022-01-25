@@ -3,6 +3,7 @@ using de4dot.blocks.cflow;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 using dnlib.DotNet.Writer;
+using System;
 using System.Collections.Generic;
 
 namespace DeMutation
@@ -13,9 +14,7 @@ namespace DeMutation
         {
             string path = args[0];
             ModuleDefMD module = ModuleDefMD.Load(path);
-            BlocksCflowDeobfuscator deobfuscator = new BlocksCflowDeobfuscator();
-            deobfuscator.Add(new ControlFlowDeobfuscator());
-            deobfuscator.Add(new MethodCallInliner(true)); //Added this for my own benefit, you can remove it yourself
+          
             foreach (TypeDef type in module.GetTypes())
             {
                 foreach (MethodDef method in type.Methods)
@@ -24,6 +23,10 @@ namespace DeMutation
                     {
                         if (method.Body.HasInstructions)
                         {
+                            BlocksCflowDeobfuscator deobfuscator = new BlocksCflowDeobfuscator();
+                            deobfuscator.Add(new ControlFlowDeobfuscator());
+                            deobfuscator.Add(new MethodCallInliner(true)); //Added this for my own benefit, you can remove it yourself
+                            Console.WriteLine("Cleaning Method:" + method.FullName);
                             Blocks blocks = new Blocks(method);
                             deobfuscator.Initialize(blocks);
                             deobfuscator.Deobfuscate();
@@ -40,10 +43,12 @@ namespace DeMutation
                     }
                 }
             }
+            Console.WriteLine("Finished.");
             NativeModuleWriterOptions writerOptions = new NativeModuleWriterOptions(module, true);
             writerOptions.Logger = DummyLogger.NoThrowInstance;
             writerOptions.MetadataOptions.Flags = MetadataFlags.PreserveAll;
             module.NativeWrite(path.Replace(".exe", "-demutate.exe"), writerOptions);
+            Console.ReadKey();
         }
     }
 }
